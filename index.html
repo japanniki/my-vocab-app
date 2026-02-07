@@ -1,351 +1,255 @@
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App />);
-</script>import React, { useState, useEffect } from 'react';
-import { 
-  Plus, 
-  Trash2, 
-  CheckCircle, 
-  Circle, 
-  BookOpen, 
-  Brain, 
-  List, 
-  ChevronRight,
-  Save,
-  X,
-  Loader2,
-  RefreshCw,
-  FileSpreadsheet
-} from 'lucide-react';
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VocabSheet - 英単語帳</title>
+    <!-- 必要なライブラリの読み込み -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- アイコンライブラリ -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-slate-50">
+    <div id="root"></div>
 
-// --- Google Apps Script (GAS) Configuration ---
-// 【修正】URLをダブルクォーテーションで囲いました
-const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycby6R_xXVII2bE6SnUbD1PLeh7xR9BS27IiIQVZT97kVv7Icm0dsCgI7h9dhDZ1MnVUA/exec"; 
+    <script type="text/babel">
+        // LucideアイコンをReactで使えるようにする準備
+        const { 
+          Plus, Trash2, CheckCircle, Circle, BookOpen, 
+          Brain, List, ChevronRight, Save, X, 
+          Loader2, RefreshCw, FileSpreadsheet 
+        } = {
+            Plus: (props) => <i data-lucide="plus" {...props}></i>,
+            Trash2: (props) => <i data-lucide="trash-2" {...props}></i>,
+            CheckCircle: (props) => <i data-lucide="check-circle" {...props}></i>,
+            Circle: (props) => <i data-lucide="circle" {...props}></i>,
+            BookOpen: (props) => <i data-lucide="book-open" {...props}></i>,
+            Brain: (props) => <i data-lucide="brain" {...props}></i>,
+            List: (props) => <i data-lucide="list" {...props}></i>,
+            ChevronRight: (props) => <i data-lucide="chevron-right" {...props}></i>,
+            Save: (props) => <i data-lucide="save" {...props}></i>,
+            X: (props) => <i data-lucide="x" {...props}></i>,
+            Loader2: (props) => <i data-lucide="loader-2" {...props}></i>,
+            RefreshCw: (props) => <i data-lucide="refresh-cw" {...props}></i>,
+            FileSpreadsheet: (props) => <i data-lucide="file-spreadsheet" {...props}></i>
+        };
 
-export default function App() {
-  const [words, setWords] = useState([]);
-  const [view, setView] = useState('list');
-  const [loading, setLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  
-  // Form states
-  const [newWord, setNewWord] = useState('');
-  const [newMeaning, setNewMeaning] = useState('');
-  const [newExample, setNewExample] = useState('');
-  
-  // Quiz states
-  const [quizIndex, setQuizIndex] = useState(0);
-  const [showAnswer, setShowAnswer] = useState(false);
-  const [quizOrder, setQuizOrder] = useState([]);
+        const { useState, useEffect } = React;
 
-  // データの読み込み (GASから取得)
-  const fetchWords = async () => {
-    if (!GAS_WEB_APP_URL) return;
-    setLoading(true);
-    try {
-      const response = await fetch(GAS_WEB_APP_URL);
-      const data = await response.json();
-      // 新しい順に並び替え
-      if (Array.isArray(data)) {
-        data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        setWords(data);
-      }
-    } catch (error) {
-      console.error("Fetch error:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+        // URLの末尾に不要なスペースが入らないよう .trim() を追加
+        const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycby6R_xXVII2bE6SnUbD1PLeh7xR9BS27IiIQVZT97kVv7Icm0dsCgI7h9dhDZ1MnVUA/exec".trim();
 
-  useEffect(() => {
-    if (GAS_WEB_APP_URL) {
-      fetchWords();
-    }
-  }, []);
+        function App() {
+            const [words, setWords] = useState([]);
+            const [view, setView] = useState('list');
+            const [loading, setLoading] = useState(false);
+            const [isSaving, setIsSaving] = useState(false);
+            const [newWord, setNewWord] = useState('');
+            const [newMeaning, setNewMeaning] = useState('');
+            const [newExample, setNewExample] = useState('');
+            const [quizIndex, setQuizIndex] = useState(0);
+            const [showAnswer, setShowAnswer] = useState(false);
+            const [quizOrder, setQuizOrder] = useState([]);
+            const [errorMsg, setErrorMsg] = useState('');
 
-  // 単語の追加
-  const addWord = async (e) => {
-    e.preventDefault();
-    if (!newWord || !newMeaning || !GAS_WEB_APP_URL) return;
+            useEffect(() => {
+                fetchWords();
+            }, []);
 
-    setIsSaving(true);
-    const wordData = {
-      action: 'add',
-      word: newWord,
-      meaning: newMeaning,
-      example: newExample,
-      status: 'learning',
-      createdAt: new Date().toISOString()
-    };
+            // アイコンを描画するための命令（Lucide用）
+            useEffect(() => {
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            });
 
-    try {
-      await fetch(GAS_WEB_APP_URL, {
-        method: 'POST',
-        body: JSON.stringify(wordData)
-      });
-      
-      setNewWord('');
-      setNewMeaning('');
-      setNewExample('');
-      setView('list');
-      fetchWords(); // 再読み込み
-    } catch (error) {
-      console.error("Save error:", error);
-    } finally {
-      setIsSaving(false);
-    }
-  };
+            const fetchWords = async () => {
+                if (!GAS_WEB_APP_URL) return;
+                setLoading(true);
+                setErrorMsg('');
+                try {
+                    // cache: 'no-cache' を追加して最新データを取得しやすくする
+                    const response = await fetch(GAS_WEB_APP_URL, { cache: 'no-cache' });
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    const data = await response.json();
+                    if (Array.isArray(data)) {
+                        data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                        setWords(data);
+                    }
+                } catch (error) {
+                    console.error("Fetch error:", error);
+                    setErrorMsg('データの取得に失敗しました。GASの公開設定を確認してください。');
+                } finally {
+                    setLoading(false);
+                }
+            };
 
-  // ステータスの切り替え
-  const toggleStatus = async (id, currentStatus) => {
-    if (!GAS_WEB_APP_URL) return;
-    const newStatus = currentStatus === 'learning' ? 'mastered' : 'learning';
-    
-    try {
-      // ローカル状態を先に更新（サクサク動くように見せる）
-      setWords(words.map(w => w.id === id ? {...w, status: newStatus} : w));
-      
-      await fetch(GAS_WEB_APP_URL, {
-        method: 'POST',
-        body: JSON.stringify({ action: 'update', id, status: newStatus })
-      });
-    } catch (error) {
-      console.error("Update error:", error);
-      fetchWords(); // 失敗したら元に戻す
-    }
-  };
+            const addWord = async (e) => {
+                e.preventDefault();
+                if (!newWord || !newMeaning) return;
+                setIsSaving(true);
+                try {
+                    const response = await fetch(GAS_WEB_APP_URL, {
+                        method: 'POST',
+                        mode: 'no-cors', // CORSエラー対策
+                        body: JSON.stringify({
+                            action: 'add',
+                            word: newWord,
+                            meaning: newMeaning,
+                            example: newExample,
+                            status: 'learning',
+                            createdAt: new Date().toISOString()
+                        })
+                    });
+                    setNewWord(''); setNewMeaning(''); setNewExample('');
+                    setView('list');
+                    // no-cors の場合はレスポンスが読めないため、少し待ってから再取得
+                    setTimeout(fetchWords, 1500);
+                } catch (error) {
+                    console.error("Save error:", error);
+                    alert("保存に失敗しました。");
+                } finally {
+                    setIsSaving(false);
+                }
+            };
 
-  // 単語の削除
-  const deleteWord = async (id) => {
-    if (!GAS_WEB_APP_URL) return;
-    if (!confirm("この単語を削除してもよろしいですか？")) return;
+            const toggleStatus = async (id, currentStatus) => {
+                const newStatus = currentStatus === 'learning' ? 'mastered' : 'learning';
+                setWords(words.map(w => w.id === id ? {...w, status: newStatus} : w));
+                try {
+                    await fetch(GAS_WEB_APP_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        body: JSON.stringify({ action: 'update', id, status: newStatus })
+                    });
+                } catch (error) { console.error(error); fetchWords(); }
+            };
 
-    try {
-      setWords(words.filter(w => w.id !== id));
-      await fetch(GAS_WEB_APP_URL, {
-        method: 'POST',
-        body: JSON.stringify({ action: 'delete', id })
-      });
-    } catch (error) {
-      console.error("Delete error:", error);
-      fetchWords();
-    }
-  };
+            const deleteWord = async (id) => {
+                if (!confirm("削除しますか？")) return;
+                setWords(words.filter(w => w.id !== id));
+                try {
+                    await fetch(GAS_WEB_APP_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        body: JSON.stringify({ action: 'delete', id })
+                    });
+                } catch (error) { console.error(error); fetchWords(); }
+            };
 
-  const startQuiz = () => {
-    if (words.length === 0) return;
-    const shuffled = [...words].sort(() => Math.random() - 0.5);
-    setQuizOrder(shuffled);
-    setQuizIndex(0);
-    setShowAnswer(false);
-    setView('quiz');
-  };
+            const startQuiz = () => {
+                if (words.length === 0) return;
+                setQuizOrder([...words].sort(() => Math.random() - 0.5));
+                setQuizIndex(0); setShowAnswer(false); setView('quiz');
+            };
 
-  const nextQuizItem = () => {
-    if (quizIndex < quizOrder.length - 1) {
-      setQuizIndex(quizIndex + 1);
-      setShowAnswer(false);
-    } else {
-      setView('list');
-    }
-  };
+            return (
+                <div className="min-h-screen p-4 md:p-8">
+                    <div className="max-w-2xl mx-auto">
+                        <header className="flex justify-between items-center mb-8">
+                            <div>
+                                <h1 className="text-3xl font-bold text-indigo-600 italic">VocabSheet</h1>
+                                <p className="text-slate-500 text-sm">Spreadsheet App</p>
+                            </div>
+                            <button onClick={fetchWords} className="p-2 text-slate-400">
+                                <RefreshCw className={loading ? "animate-spin" : ""} />
+                            </button>
+                        </header>
 
-  // GASのURLがない場合の警告
-  if (!GAS_WEB_APP_URL) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-slate-50 p-6 text-center">
-        <div className="max-w-md bg-white p-8 rounded-3xl shadow-xl border border-red-100">
-          <FileSpreadsheet className="mx-auto text-red-400 mb-4" size={48} />
-          <h2 className="text-xl font-bold text-slate-800 mb-2">準備が必要です</h2>
-          <p className="text-slate-500 mb-6 text-sm">
-            スプレッドシートと連携するためのURLが設定されていません。ガイドに従ってGASをデプロイし、そのURLをコードに貼り付けてください。
-          </p>
-          <div className="text-xs bg-slate-100 p-3 rounded-lg text-left font-mono overflow-auto">
-            const GAS_WEB_APP_URL = "ここに貼り付け";
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans p-4 md:p-8">
-      <div className="max-w-2xl mx-auto">
-        
-        {/* Header */}
-        <header className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-indigo-600">VocabSheet</h1>
-            <p className="text-slate-500 text-sm">Googleスプレッドシート連携アプリ</p>
-          </div>
-          <button 
-            onClick={fetchWords} 
-            disabled={loading}
-            className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"
-          >
-            <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
-          </button>
-        </header>
-
-        {/* Navigation */}
-        <nav className="flex gap-2 mb-6">
-          <button 
-            onClick={() => setView('list')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-all ${view === 'list' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-600'}`}
-          >
-            <List size={18} /> 一覧
-          </button>
-          <button 
-            onClick={() => setView('add')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-all ${view === 'add' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-600'}`}
-          >
-            <Plus size={18} /> 追加
-          </button>
-          <button 
-            onClick={startQuiz}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-all ${view === 'quiz' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-600'}`}
-          >
-            <Brain size={18} /> クイズ
-          </button>
-        </nav>
-
-        {/* Main Content */}
-        <main>
-          {loading && view === 'list' ? (
-            <div className="text-center py-20">
-              <Loader2 className="animate-spin text-indigo-500 mx-auto mb-2" size={32} />
-              <p className="text-slate-400">シートから読込中...</p>
-            </div>
-          ) : view === 'list' && (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center px-2">
-                <span className="text-sm font-medium text-slate-500">{words.length} 単語</span>
-                <div className="flex gap-4 text-[10px] uppercase tracking-wider font-bold">
-                  <span className="flex items-center gap-1 text-amber-600"><Circle size={10} /> 学習中</span>
-                  <span className="flex items-center gap-1 text-emerald-600"><CheckCircle size={10} /> 完了</span>
-                </div>
-              </div>
-              
-              {words.length === 0 ? (
-                <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-slate-200">
-                  <BookOpen className="mx-auto text-slate-300 mb-4" size={48} />
-                  <p className="text-slate-400">単語を追加してシートに保存しましょう！</p>
-                </div>
-              ) : (
-                <div className="grid gap-3">
-                  {words.map((item) => (
-                    <div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-start justify-between group">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-1">
-                          <button onClick={() => toggleStatus(item.id, item.status)}>
-                            {item.status === 'mastered' ? 
-                              <CheckCircle className="text-emerald-500" size={22} /> : 
-                              <Circle className="text-amber-400" size={22} />
-                            }
-                          </button>
-                          <h3 className="text-lg font-bold text-slate-700">{item.word}</h3>
-                        </div>
-                        <p className="text-slate-600 ml-9">{item.meaning}</p>
-                        {item.example && (
-                          <div className="ml-9 mt-2 p-2 bg-slate-50 rounded-lg">
-                            <p className="text-slate-500 text-sm italic">"{item.example}"</p>
-                          </div>
+                        {errorMsg && (
+                            <div className="bg-red-50 text-red-600 p-3 rounded-xl mb-4 text-sm text-center">
+                                {errorMsg}
+                            </div>
                         )}
-                      </div>
-                      <button onClick={() => deleteWord(item.id)} className="text-slate-300 hover:text-red-500 p-2">
-                        <Trash2 size={18} />
-                      </button>
+
+                        <nav className="flex gap-2 mb-6">
+                            <button onClick={() => setView('list')} className={`flex-1 py-3 rounded-xl flex items-center justify-center gap-2 ${view === 'list' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-600'}`}>
+                                <List size={18} /> 一覧
+                            </button>
+                            <button onClick={() => setView('add')} className={`flex-1 py-3 rounded-xl flex items-center justify-center gap-2 ${view === 'add' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-600'}`}>
+                                <Plus size={18} /> 追加
+                            </button>
+                            <button onClick={startQuiz} className={`flex-1 py-3 rounded-xl flex items-center justify-center gap-2 ${view === 'quiz' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-600'}`}>
+                                <Brain size={18} /> クイズ
+                            </button>
+                        </nav>
+
+                        <main>
+                            {view === 'list' && (
+                                <div className="space-y-4">
+                                    {loading ? (
+                                        <div className="text-center py-20 flex flex-col items-center gap-2">
+                                            <Loader2 className="animate-spin text-indigo-500" />
+                                            <p className="text-slate-400">読み込み中...</p>
+                                        </div>
+                                    ) : (
+                                        words.length === 0 ? (
+                                            <div className="text-center py-20 text-slate-400">単語がありません。</div>
+                                        ) : (
+                                            words.map(item => (
+                                                <div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-start justify-between">
+                                                    <div className="flex-1 flex gap-3">
+                                                        <button onClick={() => toggleStatus(item.id, item.status)}>
+                                                            {item.status === 'mastered' ? <CheckCircle className="text-emerald-500" /> : <Circle className="text-amber-400" />}
+                                                        </button>
+                                                        <div>
+                                                            <h3 className="text-lg font-bold text-slate-700">{item.word}</h3>
+                                                            <p className="text-slate-600">{item.meaning}</p>
+                                                        </div>
+                                                    </div>
+                                                    <button onClick={() => deleteWord(item.id)} className="text-slate-300 hover:text-red-500"><Trash2 size={18} /></button>
+                                                </div>
+                                            ))
+                                        )
+                                    )}
+                                </div>
+                            )}
+
+                            {view === 'add' && (
+                                <form onSubmit={addWord} className="bg-white p-6 rounded-3xl shadow-xl space-y-4">
+                                    <input type="text" value={newWord} onChange={e => setNewWord(e.target.value)} className="w-full p-3 border rounded-xl" placeholder="英単語" required />
+                                    <input type="text" value={newMeaning} onChange={e => setNewMeaning(e.target.value)} className="w-full p-3 border rounded-xl" placeholder="意味" required />
+                                    <textarea value={newExample} onChange={e => setNewExample(e.target.value)} className="w-full p-3 border rounded-xl h-24" placeholder="例文" />
+                                    <button type="submit" disabled={isSaving} className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl shadow-lg flex items-center justify-center gap-2">
+                                        {isSaving && <Loader2 className="animate-spin" />}
+                                        {isSaving ? "保存中..." : "スプレッドシートに保存"}
+                                    </button>
+                                </form>
+                            )}
+
+                            {view === 'quiz' && quizOrder.length > 0 && (
+                                <div className="space-y-6">
+                                    <div className="bg-white min-h-[300px] flex flex-col items-center justify-center p-8 rounded-3xl shadow-xl border border-indigo-50">
+                                        <h2 className="text-5xl font-black text-slate-800 mb-8">{quizOrder[quizIndex].word}</h2>
+                                        {showAnswer ? (
+                                            <div className="text-center">
+                                                <p className="text-3xl font-bold text-indigo-600">{quizOrder[quizIndex].meaning}</p>
+                                            </div>
+                                        ) : (
+                                            <button onClick={() => setShowAnswer(true)} className="bg-indigo-50 text-indigo-600 px-10 py-4 rounded-full font-bold">答えを確認</button>
+                                        )}
+                                    </div>
+                                    {showAnswer && (
+                                        <button onClick={() => {
+                                            if (quizIndex < quizOrder.length - 1) { setQuizIndex(quizIndex + 1); setShowAnswer(false); }
+                                            else { setView('list'); }
+                                        }} className="w-full bg-emerald-500 text-white font-bold py-5 rounded-2xl shadow-lg flex items-center justify-center gap-2">
+                                            次へ <ChevronRight />
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </main>
                     </div>
-                  ))}
                 </div>
-              )}
-            </div>
-          )}
+            );
+        }
 
-          {view === 'add' && (
-            <form onSubmit={addWord} className="bg-white p-6 rounded-3xl shadow-xl space-y-4 border border-slate-100">
-              <h2 className="text-xl font-bold mb-4 text-slate-700">単語をシートに登録</h2>
-              <div>
-                <label className="block text-xs font-bold text-slate-400 mb-1 uppercase">英単語</label>
-                <input 
-                  type="text" 
-                  value={newWord}
-                  onChange={(e) => setNewWord(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none"
-                  placeholder="例: Fantastic"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-400 mb-1 uppercase">意味</label>
-                <input 
-                  type="text" 
-                  value={newMeaning}
-                  onChange={(e) => setNewMeaning(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none"
-                  placeholder="例: すばらしい"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-400 mb-1 uppercase">例文</label>
-                <textarea 
-                  value={newExample}
-                  onChange={(e) => setNewExample(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none h-24 resize-none"
-                  placeholder="It's fantastic!"
-                />
-              </div>
-              <button 
-                type="submit"
-                disabled={isSaving}
-                className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-indigo-700 disabled:bg-slate-300 transition-all flex items-center justify-center gap-2"
-              >
-                {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
-                {isSaving ? '保存中...' : 'シートに保存する'}
-              </button>
-            </form>
-          )}
-
-          {view === 'quiz' && quizOrder.length > 0 && (
-            <div className="space-y-6">
-              <div className="flex justify-between items-center text-sm font-medium text-slate-500">
-                <span>問題 {quizIndex + 1} / {quizOrder.length}</span>
-                <button onClick={() => setView('list')}><X size={24}/></button>
-              </div>
-
-              <div className="bg-white min-h-[300px] flex flex-col items-center justify-center p-8 rounded-3xl shadow-xl border border-indigo-50">
-                <h2 className="text-5xl font-black text-slate-800 mb-8 text-center">{quizOrder[quizIndex].word}</h2>
-                
-                {showAnswer ? (
-                  <div className="w-full text-center">
-                    <p className="text-3xl font-bold text-indigo-600 mb-4">{quizOrder[quizIndex].meaning}</p>
-                    {quizOrder[quizIndex].example && (
-                      <p className="text-slate-500 italic">"{quizOrder[quizIndex].example}"</p>
-                    )}
-                  </div>
-                ) : (
-                  <button 
-                    onClick={() => setShowAnswer(true)}
-                    className="bg-indigo-50 text-indigo-600 px-10 py-4 rounded-full font-bold"
-                  >
-                    答えを確認
-                  </button>
-                )}
-              </div>
-
-              {showAnswer && (
-                <button 
-                  onClick={nextQuizItem}
-                  className="w-full bg-emerald-500 text-white font-bold py-5 rounded-2xl shadow-lg flex items-center justify-center gap-2 text-lg"
-                >
-                  {quizIndex === quizOrder.length - 1 ? '完了！' : '次へ'} <ChevronRight size={24} />
-                </button>
-              )}
-            </div>
-          )}
-        </main>
-      </div>
-    </div>
-  );
-}
-
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
